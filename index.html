@@ -721,14 +721,6 @@
             container.style.width = '1050px'; 
             container.style.backgroundColor = '#ffffff';
             
-            // Thiết lập style tuyệt đối để tránh việc html2canvas tính sai tọa độ do đang bị cuộn chuột
-            container.style.position = 'absolute';
-            container.style.top = '0';
-            container.style.left = '0';
-            container.style.zIndex = '-9999';
-            
-            document.body.appendChild(container); // Bắt buộc đưa vào DOM để render kích thước chuẩn
-            
             const title = document.createElement('h2');
             title.innerText = 'Bảng Xếp hạng Doanh số Khách hàng';
             title.style.textAlign = 'center';
@@ -786,10 +778,7 @@
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
 
-            html2pdf().set(opt).from(container).save().then(() => {
-                // Xóa phần tử ẩn sau khi tạo xong PDF
-                document.body.removeChild(container);
-            });
+            html2pdf().set(opt).from(container).save();
         });
 
         renderTable();
