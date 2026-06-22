@@ -161,6 +161,13 @@
         .btn-export-excel:hover {
             background-color: #059669;
         }
+        .btn-import-excel {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-import-excel:hover {
+            background-color: #2563eb;
+        }
         .btn-export-pdf {
             background-color: #f59e0b;
             color: white;
@@ -403,6 +410,8 @@
                     <h2>Bảng Xếp hạng Doanh số</h2>
                     <div class="header-actions">
                         <input type="text" id="searchInput" class="search-box" placeholder="Tìm kiếm khách hàng...">
+                        <input type="file" id="fileInputExcel" accept=".xlsx, .xls, .csv" style="display: none;">
+                        <button type="button" id="btnImportExcel" class="btn btn-import-excel btn-sm">Nhập Excel</button>
                         <button type="button" id="btnExportExcel" class="btn btn-export-excel btn-sm">Xuất Excel</button>
                         <button type="button" id="btnExportPDF" class="btn btn-export-pdf btn-sm">Xuất PDF</button>
                     </div>
@@ -534,6 +543,8 @@
         const btnUpdate = document.getElementById('btnUpdate');
         const btnDelete = document.getElementById('btnDelete');
         const formTitle = document.getElementById('formTitle');
+        const fileInputExcel = document.getElementById('fileInputExcel');
+        const btnImportExcel = document.getElementById('btnImportExcel');
         const btnExportExcel = document.getElementById('btnExportExcel');
         const btnExportPDF = document.getElementById('btnExportPDF');
 
@@ -925,6 +936,83 @@
 
             // Tạo và tải file PDF
             pdfMake.createPdf(docDefinition).download('Bang_Xep_Hang_Doanh_So.pdf');
+        });
+
+        // --- CHỨC NĂNG NHẬP FILE EXCEL ---
+        btnImportExcel.addEventListener('click', function() {
+            fileInputExcel.click();
+        });
+
+        fileInputExcel.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                    let importedCount = 0;
+                    let updatedCount = 0;
+
+                    jsonData.forEach(row => {
+                        // Linh hoạt nhận diện tên cột từ file (bao gồm các cột khi xuất ra)
+                        const custId = (row["Mã KH"] || row["customerId"] || "").toString().trim();
+                        if (!custId) return; // Bỏ qua dòng không có Mã KH
+
+                        // Xử lý cột doanh số: loại bỏ dấu phẩy nếu file Excel lưu dạng chuỗi
+                        let salesVal = row["Doanh số KH (VNĐ)"] || row["Doanh số (VNĐ)"] || row["Doanh số"] || row["sales"] || 0;
+                        if (typeof salesVal === 'string') {
+                            salesVal = Number(salesVal.replace(/,/g, '').replace(/\./g, '')) || 0;
+                        }
+
+                        const newCustomer = {
+                            customerId: custId,
+                            taxId: (row["MST"] || row["Mã số thuế"] || row["taxId"] || "").toString().trim(),
+                            companyName: (row["Tên Công ty"] || row["companyName"] || "").toString().trim(),
+                            contactName: (row["Người liên hệ"] || row["Người LH"] || row["contactName"] || "").toString().trim(),
+                            phone: (row["Số điện thoại"] || row["SĐT"] || row["phone"] || "").toString().trim(),
+                            sales: Number(salesVal) || 0,
+                            notes: (row["Ghi chú"] || row["notes"] || "").toString().trim()
+                        };
+
+                        // Cập nhật nếu trùng ID, thêm mới nếu chưa có
+                        const existingIndex = customers.findIndex(c => c.customerId.toLowerCase() === custId.toLowerCase());
+                        if (existingIndex !== -1) {
+                            customers[existingIndex] = newCustomer;
+                            updatedCount++;
+                        } else {
+                            customers.push(newCustomer);
+                            importedCount++;
+                        }
+                    });
+
+                    saveData();
+                    currentPage = 1;
+                    renderTable();
+
+                    // Hiển thị thông báo thành công
+                    notificationTitle.innerText = "Nhập Excel Thành Công!";
+                    notificationTitle.style.color = "#10b981";
+                    notificationMessage.innerHTML = `Đã thêm mới: <strong>${importedCount}</strong> khách hàng.<br>Đã cập nhật: <strong>${updatedCount}</strong> khách hàng (do trùng mã).`;
+                    notificationModal.style.display = 'flex';
+
+                } catch (error) {
+                    console.error("Lỗi đọc file Excel:", error);
+                    notificationTitle.innerText = "Lỗi Nhập File";
+                    notificationTitle.style.color = "#ef4444";
+                    notificationMessage.innerHTML = "Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file!";
+                    notificationModal.style.display = 'flex';
+                }
+                
+                // Reset input file để chọn lại được file cũ nếu muốn
+                fileInputExcel.value = '';
+            };
+            reader.readAsArrayBuffer(file);
         });
 
         renderTable();
