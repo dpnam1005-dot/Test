@@ -97,6 +97,7 @@
             border-radius: 4px;
             font-size: 14px;
             line-height: 1.5;
+            transition: all 0.2s ease-in-out;
         }
 
         .form-control:focus {
@@ -375,8 +376,8 @@
                             <input type="text" id="sales" class="form-control" placeholder="0">
                         </div>
                         <div class="form-group" id="addSalesContainer" style="display: none;">
-                            <label for="addSales" style="color: #10b981;">Cập nhật DS (+/-)</label>
-                            <input type="text" id="addSales" class="form-control" placeholder="0" style="border-color: #10b981;">
+                            <label for="addSales">Cập nhật DS (+/-)</label>
+                            <input type="text" id="addSales" class="form-control" placeholder="0">
                         </div>
                     </div>
 
@@ -468,11 +469,23 @@
         </div>
     </div>
 
+    <!-- Modal thông báo kết quả cập nhật Doanh số -->
+    <div id="notificationModal" class="modal-overlay">
+        <div class="modal-content" style="text-align: center;">
+            <h3 id="notificationTitle" style="margin-bottom: 15px;">Thông báo</h3>
+            <p id="notificationMessage" style="margin-bottom: 25px; line-height: 1.6;"></p>
+            <div class="modal-actions" style="justify-content: center;">
+                <button type="button" id="btnCloseNotification" class="btn btn-primary" style="width: auto; min-width: 120px;">Đóng</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let customers = JSON.parse(localStorage.getItem('customers_data')) || [];
         let isEditing = false;
         let pendingCustomerData = null;
         let pendingActionData = null;
+        let pendingNotification = null; // Biến lưu tạm dữ liệu của Pop-up thông báo
 
         function saveData() {
             localStorage.setItem('customers_data', JSON.stringify(customers));
@@ -496,6 +509,12 @@
         const warningModalMessage = document.getElementById('warningModalMessage');
         const btnCancelWarning = document.getElementById('btnCancelWarning');
         const btnConfirmWarning = document.getElementById('btnConfirmWarning');
+        
+        const notificationModal = document.getElementById('notificationModal');
+        const notificationTitle = document.getElementById('notificationTitle');
+        const notificationMessage = document.getElementById('notificationMessage');
+        const btnCloseNotification = document.getElementById('btnCloseNotification');
+
         const idInput = document.getElementById('customerId');
         const taxIdInput = document.getElementById('taxId');
         const companyInput = document.getElementById('companyName');
@@ -518,7 +537,7 @@
         const btnExportExcel = document.getElementById('btnExportExcel');
         const btnExportPDF = document.getElementById('btnExportPDF');
 
-        // Định dạng dấu phẩy tự động khi nhập số (hỗ trợ cả dấu âm ở đầu)
+        // Định dạng dấu phẩy tự động và đổi màu khi nhập số
         function formatInputWithCommas(e) {
             let isNegative = this.value.startsWith('-');
             let rawValue = this.value.replace(/\D/g, ''); // Loại bỏ tất cả trừ số
@@ -530,6 +549,20 @@
                 this.value = '-'; // Trạng thái đang gõ dở dấu trừ
             } else {
                 this.value = formatted;
+            }
+
+            // Đổi màu viền và chữ cho ô cập nhật doanh số (+/-)
+            if (this.id === 'addSales') {
+                if (isNegative && formatted) {
+                    this.style.borderColor = '#ef4444'; // Viền đỏ
+                    this.style.color = '#ef4444';       // Chữ đỏ
+                } else if (!isNegative && formatted) {
+                    this.style.borderColor = '#10b981'; // Viền xanh lá
+                    this.style.color = '#10b981';       // Chữ xanh lá
+                } else {
+                    this.style.borderColor = 'var(--border-color)'; // Về mặc định
+                    this.style.color = 'var(--text-main)';
+                }
             }
         }
         
@@ -561,6 +594,8 @@
             salesInput.value = data.sales ? data.sales.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
             notesInput.value = data.notes || '';
             addSalesInput.value = ''; // Luôn reset ô cộng thêm khi đổ dữ liệu
+            addSalesInput.style.borderColor = 'var(--border-color)'; // Reset màu sắc
+            addSalesInput.style.color = 'var(--text-main)';
         }
 
         function toggleEditMode(editing) {
@@ -576,6 +611,8 @@
                 addSalesContainer.style.display = 'block';
                 salesLabel.innerText = "Doanh số gốc (VNĐ)";
                 addSalesInput.value = '';
+                addSalesInput.style.borderColor = 'var(--border-color)';
+                addSalesInput.style.color = 'var(--text-main)';
             } else {
                 formTitle.innerText = "Thông tin Khách hàng";
                 btnSubmit.style.display = 'block';
@@ -680,6 +717,15 @@
                     customers.push(data); saveData(); toggleEditMode(false); renderTable();
                 }
             }
+
+            // Gọi Pop-up thông báo thành công (nếu có cập nhật doanh số)
+            if (pendingNotification) {
+                notificationTitle.innerText = pendingNotification.title;
+                notificationTitle.style.color = pendingNotification.titleColor;
+                notificationMessage.innerHTML = pendingNotification.message;
+                notificationModal.style.display = 'flex';
+                pendingNotification = null; // Reset lại
+            }
         }
 
         function handleSaveAction(data, isUpdating) {
@@ -706,15 +752,28 @@
             
             if (addedSalesStr !== '-' && addedSalesStr !== '') {
                 const addedSales = Number(addedSalesStr) || 0;
-                if (addedSales !== 0) {
-                    data.sales += addedSales; // Cộng dồn (nếu là số âm sẽ tự trừ)
+                if (addedSales > 0) {
+                    data.sales += addedSales; // Cộng dồn
+                    pendingNotification = {
+                        title: 'Thành công!',
+                        titleColor: '#10b981',
+                        message: `Doanh số gốc của khách hàng <strong>${data.customerId}</strong> đã được <br><strong style="color: #10b981; font-size: 18px;">Tăng thêm ${formatCurrency(addedSales)}</strong>`
+                    };
+                } else if (addedSales < 0) {
+                    data.sales += addedSales; // Trừ dồn
                     if (data.sales < 0) data.sales = 0; // Đảm bảo doanh số không rớt xuống dưới 0
+                    pendingNotification = {
+                        title: 'Thành công!',
+                        titleColor: '#ef4444',
+                        message: `Doanh số gốc của khách hàng <strong>${data.customerId}</strong> đã bị <br><strong style="color: #ef4444; font-size: 18px;">Giảm đi ${formatCurrency(Math.abs(addedSales))}</strong>`
+                    };
                 }
             }
             
             handleSaveAction(data, true); 
         });
 
+        btnCloseNotification.addEventListener('click', function() { notificationModal.style.display = 'none'; });
         btnConfirmWarning.addEventListener('click', function() { if (pendingActionData) proceedWithSave(pendingActionData.data, pendingActionData.isUpdating); warningModal.style.display = 'none'; pendingActionData = null; });
         btnCancelWarning.addEventListener('click', function() { warningModal.style.display = 'none'; pendingActionData = null; });
         btnDelete.addEventListener('click', function() { const id = idInput.value.trim(); customerToDelete = id; deleteModalMessage.innerHTML = `Bạn có chắc chắn muốn xóa khách hàng <strong>"${id}"</strong> không?`; deleteModal.style.display = 'flex'; });
