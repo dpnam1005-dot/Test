@@ -611,6 +611,10 @@
                 idInput.readOnly = true;
                 idInput.style.backgroundColor = '#f1f5f9';
                 
+                // Khóa ô doanh số gốc không cho sửa trực tiếp
+                salesInput.readOnly = true;
+                salesInput.style.backgroundColor = '#f1f5f9';
+                
                 // Hiển thị ô cộng thêm doanh số
                 addSalesContainer.style.display = 'block';
                 salesLabel.innerText = "Doanh số gốc (VNĐ)";
@@ -623,6 +627,11 @@
                 editActions.style.display = 'none';
                 idInput.readOnly = false;
                 idInput.style.backgroundColor = '#fff';
+                
+                // Mở khóa ô doanh số khi thêm mới
+                salesInput.readOnly = false;
+                salesInput.style.backgroundColor = '#fff';
+                
                 setFormData({});
                 
                 // Ẩn ô cộng thêm doanh số
