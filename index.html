@@ -343,7 +343,7 @@
                             <option value="Khách mới">Khách mới (Xanh dương)</option>
                             <option value="Khách tiềm năng">Khách tiềm năng (Hồng)</option>
                             <option value="Khách đang mua">Khách đang mua (Xanh lá)</option>
-                            <option value="Khách cũ">Khách cũ (Đỏ)</option>
+                            <option value="Khách cũ">Khách không tiềm năng (Đỏ)</option>
                             <option value="Khách VIP">Khách VIP (Vàng)</option>
                         </select>
                     </div>
@@ -391,7 +391,6 @@
                 <div class="table-header-flex">
                     <h2>Bảng Xếp hạng Doanh số</h2>
                     <div class="header-actions">
-                        <button type="button" id="btnBulkDelete" class="btn btn-danger btn-sm" style="display: none;">Xóa đã chọn</button>
                         <input type="text" id="searchInput" class="search-box" placeholder="Tìm kiếm khách hàng...">
                         <input type="file" id="fileInputExcel" accept=".xlsx, .xls, .csv" style="display: none;">
                         <button type="button" id="btnImportExcel" class="btn btn-import-excel btn-sm">Nhập Excel</button>
@@ -404,7 +403,6 @@
                     <table>
                         <thead>
                             <tr>
-                                <th class="text-center" style="width: 40px;"><input type="checkbox" id="selectAllCheckbox" style="cursor: pointer; width: 16px; height: 16px;"></th>
                                 <th class="text-center">#</th>
                                 <th class="nowrap">Mã KH</th>
                                 <th class="nowrap">MST</th>
@@ -450,18 +448,6 @@
         </div>
     </div>
 
-    <!-- Modal xác nhận xóa NHIỀU KH -->
-    <div id="bulkDeleteModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 style="color: #ef4444; margin-bottom: 10px;">Xác nhận xóa nhiều</h3>
-            <p id="bulkDeleteModalMessage">Bạn có chắc chắn muốn xóa khách hàng đã chọn không?</p>
-            <div class="modal-actions">
-                <button type="button" id="btnCancelBulkDelete" class="btn btn-secondary">Hủy</button>
-                <button type="button" id="btnConfirmBulkDelete" class="btn btn-danger">Xóa Tất Cả</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal cảnh báo trùng lặp thông tin khác -->
     <div id="warningModal" class="modal-overlay">
         <div class="modal-content">
@@ -497,7 +483,6 @@
         let pendingCustomerData = null;
         let pendingActionData = null;
         let pendingNotification = null;
-        let selectedCustomerIds = new Set();
 
         function saveData() {
             try {
@@ -533,13 +518,6 @@
         const notificationTitle = document.getElementById('notificationTitle');
         const notificationMessage = document.getElementById('notificationMessage');
         const btnCloseNotification = document.getElementById('btnCloseNotification');
-
-        const bulkDeleteModal = document.getElementById('bulkDeleteModal');
-        const bulkDeleteModalMessage = document.getElementById('bulkDeleteModalMessage');
-        const btnBulkDelete = document.getElementById('btnBulkDelete');
-        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-        const btnCancelBulkDelete = document.getElementById('btnCancelBulkDelete');
-        const btnConfirmBulkDelete = document.getElementById('btnConfirmBulkDelete');
 
         const idInput = document.getElementById('customerId');
         const taxIdInput = document.getElementById('taxId');
@@ -703,17 +681,6 @@
             paginationContainer.appendChild(nextBtn);
         }
 
-        function checkSelectAllStatus() {
-            if (!selectAllCheckbox) return;
-            const checkboxes = document.querySelectorAll('.row-checkbox');
-            if (checkboxes.length === 0) {
-                selectAllCheckbox.checked = false;
-                return;
-            }
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            selectAllCheckbox.checked = allChecked;
-        }
-
         function renderTable() {
             const query = searchInput.value.toLowerCase();
             let filtered = customers.filter(c => 
@@ -732,9 +699,8 @@
             
             tableBody.innerHTML = '';
             if (paginatedItems.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: #94a3b8; padding: 30px;">Không có dữ liệu.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: #94a3b8; padding: 30px;">Không có dữ liệu.</td></tr>`;
                 paginationContainer.innerHTML = '';
-                checkSelectAllStatus();
                 return;
             }
             paginatedItems.forEach((customer, index) => {
@@ -746,9 +712,6 @@
                 let maKhTitle = customer.classification ? `Phân loại: ${customer.classification}` : 'Chưa phân loại';
                 
                 tr.innerHTML = `
-                    <td class="text-center" onclick="event.stopPropagation()">
-                        <input type="checkbox" class="row-checkbox" style="cursor: pointer; width: 16px; height: 16px;" data-id="${customer.customerId}" ${selectedCustomerIds.has(customer.customerId) ? 'checked' : ''}>
-                    </td>
                     <td class="text-center"><strong>${startIndex + index + 1}</strong></td>
                     <td class="nowrap" style="color: ${maKhColor}; font-weight: bold;" title="${maKhTitle}">${customer.customerId}</td>
                     <td class="nowrap">${customer.taxId || '-'}</td>
@@ -760,7 +723,6 @@
                 `;
                 tableBody.appendChild(tr);
             });
-            checkSelectAllStatus();
             renderPagination(filtered.length);
         }
 
@@ -1047,79 +1009,6 @@
                 fileInputExcel.value = '';
             };
             reader.readAsArrayBuffer(file);
-        });
-
-        // --- CHỨC NĂNG XÓA NHIỀU KHÁCH HÀNG ---
-        function updateBulkDeleteUI() {
-            if (selectedCustomerIds.size > 0) {
-                btnBulkDelete.style.display = 'inline-block';
-                btnBulkDelete.innerText = `Xóa đã chọn (${selectedCustomerIds.size})`;
-            } else {
-                btnBulkDelete.style.display = 'none';
-            }
-        }
-
-        tableBody.addEventListener('change', function(e) {
-            if (e.target.classList.contains('row-checkbox')) {
-                const id = e.target.dataset.id;
-                if (e.target.checked) {
-                    selectedCustomerIds.add(id);
-                } else {
-                    selectedCustomerIds.delete(id);
-                }
-                updateBulkDeleteUI();
-                checkSelectAllStatus();
-            }
-        });
-
-        if (selectAllCheckbox) {
-            selectAllCheckbox.addEventListener('change', function(e) {
-                const isChecked = e.target.checked;
-                const checkboxes = document.querySelectorAll('.row-checkbox');
-                checkboxes.forEach(cb => {
-                    cb.checked = isChecked;
-                    const id = cb.dataset.id;
-                    if (isChecked) {
-                        selectedCustomerIds.add(id);
-                    } else {
-                        selectedCustomerIds.delete(id);
-                    }
-                });
-                updateBulkDeleteUI();
-            });
-        }
-
-        if (btnBulkDelete) {
-            btnBulkDelete.addEventListener('click', () => {
-                bulkDeleteModalMessage.innerHTML = `Bạn có chắc chắn muốn xóa <strong>${selectedCustomerIds.size}</strong> khách hàng đã chọn không? Dữ liệu không thể khôi phục.`;
-                bulkDeleteModal.style.display = 'flex';
-            });
-        }
-
-        document.getElementById('btnCancelBulkDelete')?.addEventListener('click', () => {
-            bulkDeleteModal.style.display = 'none';
-        });
-
-        document.getElementById('btnConfirmBulkDelete')?.addEventListener('click', () => {
-            customers = customers.filter(c => !selectedCustomerIds.has(c.customerId));
-            saveData();
-            
-            // Xóa UI khách hàng đang mở sửa nếu nằm trong danh sách bị xóa
-            const currentEditId = idInput.value.trim();
-            if (currentEditId && selectedCustomerIds.has(currentEditId)) {
-                toggleEditMode(false);
-            }
-            
-            selectedCustomerIds.clear();
-            updateBulkDeleteUI();
-            renderTable();
-            
-            bulkDeleteModal.style.display = 'none';
-            
-            notificationTitle.innerText = "Đã xóa thành công!";
-            notificationTitle.style.color = "#ef4444";
-            notificationMessage.innerHTML = "Các khách hàng được chọn đã bị xóa khỏi hệ thống.";
-            notificationModal.style.display = 'flex';
         });
 
         // Khởi động giao diện bảng lần đầu
