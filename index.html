@@ -340,11 +340,11 @@
                         <label for="classification">Phân loại khách hàng</label>
                         <select id="classification" class="form-control">
                             <option value="">-- Chưa phân loại --</option>
-                            <option value="Khách mới">Khách hàng mới</option>
-                            <option value="Khách tiềm năng">Khách hàng tiềm năng</option>
-                            <option value="Khách đang mua">Khách đanng mua nhiều</option>
-                            <option value="Khách cũ">Khách hàng không tiềm năng</option>
-                            <option value="Khách VIP">Khách VIP</option>
+                            <option value="Khách mới">Khách mới (Xanh dương)</option>
+                            <option value="Khách tiềm năng">Khách tiềm năng (Hồng)</option>
+                            <option value="Khách đang mua">Khách đang mua (Xanh lá)</option>
+                            <option value="Khách cũ">Khách không tiềm năng (Đỏ)</option>
+                            <option value="Khách VIP">Khách VIP (Vàng)</option>
                         </select>
                     </div>
 
@@ -404,7 +404,19 @@
                         <thead>
                             <tr>
                                 <th class="text-center">#</th>
-                                <th class="nowrap">Mã KH</th>
+                                <th class="nowrap">
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <span>Mã KH</span>
+                                        <select id="filterClassification" style="padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 11px; font-weight: normal; background: #fff; cursor: pointer; color: var(--text-main);">
+                                            <option value="">Tất cả phân loại</option>
+                                            <option value="Khách mới">Khách mới</option>
+                                            <option value="Khách tiềm năng">Khách tiềm năng</option>
+                                            <option value="Khách đang mua">Khách đang mua</option>
+                                            <option value="Khách cũ">Khách cũ (không tiềm năng)</option>
+                                            <option value="Khách VIP">Khách VIP</option>
+                                        </select>
+                                    </div>
+                                </th>
                                 <th class="nowrap">MST</th>
                                 <th class="col-company">Tên Công ty</th>
                                 <th class="nowrap">Người liên hệ</th>
@@ -501,6 +513,7 @@
         const searchInput = document.getElementById('searchInput');
         const tableBody = document.getElementById('tableBody');
         const paginationContainer = document.getElementById('pagination');
+        const filterClassification = document.getElementById('filterClassification');
         
         const modal = document.getElementById('duplicateModal');
         const modalMessage = document.getElementById('modalMessage');
@@ -683,14 +696,21 @@
 
         function renderTable() {
             const query = searchInput.value.toLowerCase();
-            let filtered = customers.filter(c => 
-                String(c.customerId || '').toLowerCase().includes(query) ||
-                (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
-                (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
-                (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
-                (c.phone && String(c.phone).includes(query)) ||
-                (c.classification && String(c.classification).toLowerCase().includes(query))
-            );
+            const filterClassVal = filterClassification ? filterClassification.value : '';
+
+            let filtered = customers.filter(c => {
+                const matchSearch = String(c.customerId || '').toLowerCase().includes(query) ||
+                    (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
+                    (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
+                    (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
+                    (c.phone && String(c.phone).includes(query)) ||
+                    (c.classification && String(c.classification).toLowerCase().includes(query));
+                
+                const matchClass = filterClassVal === '' || c.classification === filterClassVal;
+                
+                return matchSearch && matchClass;
+            });
+            
             filtered.sort((a, b) => b.sales - a.sales);
             const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
             if (currentPage > totalPages) currentPage = totalPages;
@@ -815,7 +835,12 @@
         btnConfirmDelete.addEventListener('click', function() { if (customerToDelete) { customers = customers.filter(c => String(c.customerId).toLowerCase() !== String(customerToDelete).toLowerCase()); saveData(); toggleEditMode(false); renderTable(); } deleteModal.style.display = 'none'; });
         btnCancelDelete.addEventListener('click', function() { deleteModal.style.display = 'none'; });
         btnCancelEdit.addEventListener('click', function() { toggleEditMode(false); });
+        
+        // Sự kiện lọc
         searchInput.addEventListener('input', () => { currentPage = 1; renderTable(); });
+        if (filterClassification) {
+            filterClassification.addEventListener('change', () => { currentPage = 1; renderTable(); });
+        }
 
         document.getElementById('btnConfirmModal').addEventListener('click', function() {
             const index = customers.findIndex(c => String(c.customerId).toLowerCase() === String(pendingCustomerData.customerId).toLowerCase());
@@ -826,14 +851,20 @@
         
         function getFilteredAndSortedData() {
             const query = searchInput.value.toLowerCase();
-            let filtered = customers.filter(c => 
-                String(c.customerId || '').toLowerCase().includes(query) ||
-                (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
-                (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
-                (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
-                (c.phone && String(c.phone).includes(query)) ||
-                (c.classification && String(c.classification).toLowerCase().includes(query))
-            );
+            const filterClassVal = filterClassification ? filterClassification.value : '';
+
+            let filtered = customers.filter(c => {
+                const matchSearch = String(c.customerId || '').toLowerCase().includes(query) ||
+                    (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
+                    (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
+                    (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
+                    (c.phone && String(c.phone).includes(query)) ||
+                    (c.classification && String(c.classification).toLowerCase().includes(query));
+                
+                const matchClass = filterClassVal === '' || c.classification === filterClassVal;
+                
+                return matchSearch && matchClass;
+            });
             filtered.sort((a, b) => b.sales - a.sales);
             return filtered;
         }
@@ -940,6 +971,7 @@
         });
 
         btnImportExcel.addEventListener('click', function() {
+            fileInputExcel.value = null; // Reset lại input để chọn cùng 1 file nhiều lần vẫn nhận
             fileInputExcel.click();
         });
 
@@ -954,29 +986,41 @@
                     const workbook = XLSX.read(data, {type: 'array'});
                     const firstSheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    // Thêm defval: "" để tránh lỗi Undefined nếu ô trống
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); 
 
                     let importedCount = 0;
                     let updatedCount = 0;
 
                     jsonData.forEach(row => {
-                        const custId = String(row["Mã KH"] || row["customerId"] || "").trim();
-                        if (!custId) return; 
+                        // Chuẩn hóa toàn bộ key của Object về chữ thường và xóa khoảng trắng 
+                        // -> Tránh lỗi do người dùng gõ sai tên cột (VD: " Mã KH ", "MÃ KH")
+                        const normRow = {};
+                        for (let k in row) {
+                            if (row.hasOwnProperty(k)) {
+                                normRow[k.trim().toLowerCase()] = row[k];
+                            }
+                        }
 
-                        let salesVal = row["Doanh số KH (VNĐ)"] || row["Doanh số (VNĐ)"] || row["Doanh số"] || row["sales"] || 0;
+                        // Tìm linh hoạt các tên cột tương đương
+                        const custId = String(normRow["mã kh"] || normRow["mã khách hàng"] || normRow["customerid"] || normRow["mã"] || "").trim();
+                        if (!custId) return; // Nếu hoàn toàn không có ID, bỏ qua dòng đó
+
+                        let salesVal = normRow["doanh số kh (vnđ)"] || normRow["doanh số (vnđ)"] || normRow["doanh số"] || normRow["sales"] || 0;
                         if (typeof salesVal === 'string') {
                             salesVal = Number(salesVal.replace(/[,.]/g, '')) || 0;
                         }
 
                         const newCustomer = {
                             customerId: custId,
-                            taxId: String(row["MST"] || row["Mã số thuế"] || row["taxId"] || "").trim(),
-                            companyName: String(row["Tên Công ty"] || row["companyName"] || "").trim(),
-                            classification: String(row["Phân loại"] || row["classification"] || "").trim(),
-                            contactName: String(row["Người liên hệ"] || row["Người LH"] || row["contactName"] || "").trim(),
-                            phone: String(row["Số điện thoại"] || row["SĐT"] || row["phone"] || "").trim(),
+                            taxId: String(normRow["mst"] || normRow["mã số thuế"] || normRow["taxid"] || "").trim(),
+                            companyName: String(normRow["tên công ty"] || normRow["công ty"] || normRow["companyname"] || "").trim(),
+                            classification: String(normRow["phân loại"] || normRow["phân loại khách hàng"] || normRow["classification"] || "").trim(),
+                            contactName: String(normRow["người liên hệ"] || normRow["người lh"] || normRow["contactname"] || "").trim(),
+                            phone: String(normRow["số điện thoại"] || normRow["sđt"] || normRow["phone"] || "").trim(),
                             sales: Number(salesVal) || 0,
-                            notes: String(row["Ghi chú"] || row["notes"] || "").trim()
+                            notes: String(normRow["ghi chú"] || normRow["notes"] || "").trim()
                         };
 
                         const existingIndex = customers.findIndex(c => String(c.customerId).toLowerCase() === custId.toLowerCase());
@@ -989,24 +1033,30 @@
                         }
                     });
 
-                    saveData();
-                    currentPage = 1;
-                    renderTable();
+                    // Kiểm tra xem có dòng nào được lấy ra không
+                    if (importedCount === 0 && updatedCount === 0) {
+                        notificationTitle.innerText = "Lỗi Cấu Trúc File";
+                        notificationTitle.style.color = "#ef4444";
+                        notificationMessage.innerHTML = "Không thể đọc dữ liệu! Hãy đảm bảo file Excel của bạn có chứa cột tiêu đề <strong>Mã KH</strong>.";
+                        notificationModal.style.display = 'flex';
+                    } else {
+                        saveData();
+                        currentPage = 1;
+                        renderTable();
 
-                    notificationTitle.innerText = "Nhập Excel Thành Công!";
-                    notificationTitle.style.color = "#10b981";
-                    notificationMessage.innerHTML = `Đã thêm mới: <strong>${importedCount}</strong> khách hàng.<br>Đã cập nhật: <strong>${updatedCount}</strong> khách hàng (do trùng mã).`;
-                    notificationModal.style.display = 'flex';
+                        notificationTitle.innerText = "Nhập Excel Thành Công!";
+                        notificationTitle.style.color = "#10b981";
+                        notificationMessage.innerHTML = `Đã thêm mới: <strong>${importedCount}</strong> khách hàng.<br>Đã cập nhật: <strong>${updatedCount}</strong> khách hàng (do trùng mã).`;
+                        notificationModal.style.display = 'flex';
+                    }
 
                 } catch (error) {
                     console.error("Lỗi đọc file Excel:", error);
                     notificationTitle.innerText = "Lỗi Nhập File";
                     notificationTitle.style.color = "#ef4444";
-                    notificationMessage.innerHTML = "Không thể đọc file Excel. Vui lòng kiểm tra lại định dạng file!";
+                    notificationMessage.innerHTML = "Không thể đọc file Excel. Vui lòng kiểm tra lại file của bạn (nên dùng định dạng .xlsx hoặc .csv)!";
                     notificationModal.style.display = 'flex';
                 }
-                
-                fileInputExcel.value = '';
             };
             reader.readAsArrayBuffer(file);
         });
