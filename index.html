@@ -336,6 +336,18 @@
                         <input type="text" id="companyName" class="form-control" placeholder="Tên công ty...">
                     </div>
 
+                    <div class="form-group">
+                        <label for="classification">Phân loại khách hàng</label>
+                        <select id="classification" class="form-control">
+                            <option value="">-- Chưa phân loại --</option>
+                            <option value="Khách mới">Khách mới (Xanh dương)</option>
+                            <option value="Khách tiềm năng">Khách tiềm năng (Hồng)</option>
+                            <option value="Khách đang mua">Khách đang mua (Xanh lá)</option>
+                            <option value="Khách cũ">Khách cũ (Đỏ)</option>
+                            <option value="Khách VIP">Khách VIP (Vàng)</option>
+                        </select>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="contactName">Người liên hệ</label>
@@ -347,7 +359,6 @@
                         </div>
                     </div>
 
-                    <!-- Doanh số & Cộng thêm doanh số -->
                     <div class="form-row">
                         <div class="form-group">
                             <label id="salesLabel" for="sales">Doanh số KH (VNĐ)</label>
@@ -475,7 +486,13 @@
     </div>
 
     <script>
-        let customers = JSON.parse(localStorage.getItem('customers_data')) || [];
+        let customers = [];
+        try {
+            customers = JSON.parse(localStorage.getItem('customers_data')) || [];
+        } catch(e) {
+            customers = [];
+        }
+
         let isEditing = false;
         let pendingCustomerData = null;
         let pendingActionData = null;
@@ -483,23 +500,30 @@
         let selectedCustomerIds = new Set();
 
         function saveData() {
-            localStorage.setItem('customers_data', JSON.stringify(customers));
+            try {
+                localStorage.setItem('customers_data', JSON.stringify(customers));
+            } catch (error) {
+                console.error("Lỗi khi lưu dữ liệu:", error);
+                alert("Không thể lưu dữ liệu! Vui lòng kiểm tra dung lượng trình duyệt.");
+            }
         }
 
         let currentPage = 1;
         const itemsPerPage = 10;
 
+        // Tự động gom toàn bộ DOM elements lên trên cùng để tránh lỗi khởi tạo (ReferenceError)
         const form = document.getElementById('customerForm');
         const searchInput = document.getElementById('searchInput');
         const tableBody = document.getElementById('tableBody');
         const paginationContainer = document.getElementById('pagination');
+        
         const modal = document.getElementById('duplicateModal');
         const modalMessage = document.getElementById('modalMessage');
         const deleteModal = document.getElementById('deleteModal');
         const deleteModalMessage = document.getElementById('deleteModalMessage');
         const btnCancelDelete = document.getElementById('btnCancelDelete');
         const btnConfirmDelete = document.getElementById('btnConfirmDelete');
-        let customerToDelete = null;
+        
         const warningModal = document.getElementById('warningModal');
         const warningModalMessage = document.getElementById('warningModalMessage');
         const btnCancelWarning = document.getElementById('btnCancelWarning');
@@ -510,9 +534,17 @@
         const notificationMessage = document.getElementById('notificationMessage');
         const btnCloseNotification = document.getElementById('btnCloseNotification');
 
+        const bulkDeleteModal = document.getElementById('bulkDeleteModal');
+        const bulkDeleteModalMessage = document.getElementById('bulkDeleteModalMessage');
+        const btnBulkDelete = document.getElementById('btnBulkDelete');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const btnCancelBulkDelete = document.getElementById('btnCancelBulkDelete');
+        const btnConfirmBulkDelete = document.getElementById('btnConfirmBulkDelete');
+
         const idInput = document.getElementById('customerId');
         const taxIdInput = document.getElementById('taxId');
         const companyInput = document.getElementById('companyName');
+        const classificationInput = document.getElementById('classification');
         const contactInput = document.getElementById('contactName');
         const phoneInput = document.getElementById('phone');
         
@@ -527,11 +559,14 @@
         const btnCancelEdit = document.getElementById('btnCancelEdit');
         const btnUpdate = document.getElementById('btnUpdate');
         const btnDelete = document.getElementById('btnDelete');
+        
         const formTitle = document.getElementById('formTitle');
         const fileInputExcel = document.getElementById('fileInputExcel');
         const btnImportExcel = document.getElementById('btnImportExcel');
         const btnExportExcel = document.getElementById('btnExportExcel');
         const btnExportPDF = document.getElementById('btnExportPDF');
+
+        let customerToDelete = null;
 
         // Định dạng dấu phẩy tự động và đổi màu khi nhập số
         function formatInputWithCommas(e) {
@@ -568,32 +603,44 @@
             return Number(amount).toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
         }
 
+        const classificationColors = {
+            "Khách mới": "#3b82f6",      // Xanh dương
+            "Khách tiềm năng": "#ec4899", // Hồng
+            "Khách đang mua": "#10b981",  // Xanh lá
+            "Khách cũ": "#ef4444",       // Đỏ
+            "Khách VIP": "#eab308"       // Vàng
+        };
+
         function getFormData() {
-            let parsedSales = Number(salesInput.value.replace(/,/g, ''));
+            let parsedSales = Number(salesInput.value.replace(/[,.]/g, ''));
             if (isNaN(parsedSales)) parsedSales = 0;
 
             return {
-                customerId: idInput.value.trim(),
-                taxId: taxIdInput.value.trim(),
-                companyName: companyInput.value.trim(),
-                contactName: contactInput.value.trim(),
-                phone: phoneInput.value.trim(),
+                customerId: idInput ? idInput.value.trim() : '',
+                taxId: taxIdInput ? taxIdInput.value.trim() : '',
+                companyName: companyInput ? companyInput.value.trim() : '',
+                classification: classificationInput ? classificationInput.value : '',
+                contactName: contactInput ? contactInput.value.trim() : '',
+                phone: phoneInput ? phoneInput.value.trim() : '',
                 sales: parsedSales,
-                notes: notesInput.value.trim()
+                notes: notesInput ? notesInput.value.trim() : ''
             };
         }
 
         function setFormData(data) {
-            idInput.value = data.customerId || '';
-            taxIdInput.value = data.taxId || '';
-            companyInput.value = data.companyName || '';
-            contactInput.value = data.contactName || '';
-            phoneInput.value = data.phone || '';
-            salesInput.value = data.sales || data.sales === 0 ? data.sales.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
-            notesInput.value = data.notes || '';
-            addSalesInput.value = ''; 
-            addSalesInput.style.borderColor = 'var(--border-color)';
-            addSalesInput.style.color = 'var(--text-main)';
+            if (idInput) idInput.value = data.customerId || '';
+            if (taxIdInput) taxIdInput.value = data.taxId || '';
+            if (companyInput) companyInput.value = data.companyName || '';
+            if (classificationInput) classificationInput.value = data.classification || '';
+            if (contactInput) contactInput.value = data.contactName || '';
+            if (phoneInput) phoneInput.value = data.phone || '';
+            if (salesInput) salesInput.value = data.sales || data.sales === 0 ? data.sales.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
+            if (notesInput) notesInput.value = data.notes || '';
+            if (addSalesInput) {
+                addSalesInput.value = ''; 
+                addSalesInput.style.borderColor = 'var(--border-color)';
+                addSalesInput.style.color = 'var(--text-main)';
+            }
         }
 
         function toggleEditMode(editing) {
@@ -656,24 +703,38 @@
             paginationContainer.appendChild(nextBtn);
         }
 
+        function checkSelectAllStatus() {
+            if (!selectAllCheckbox) return;
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            if (checkboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                return;
+            }
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+        }
+
         function renderTable() {
             const query = searchInput.value.toLowerCase();
             let filtered = customers.filter(c => 
-                c.customerId.toLowerCase().includes(query) ||
-                c.companyName.toLowerCase().includes(query) ||
-                c.taxId.toLowerCase().includes(query) ||
-                c.contactName.toLowerCase().includes(query) ||
-                c.phone.includes(query)
+                String(c.customerId || '').toLowerCase().includes(query) ||
+                (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
+                (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
+                (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
+                (c.phone && String(c.phone).includes(query)) ||
+                (c.classification && String(c.classification).toLowerCase().includes(query))
             );
             filtered.sort((a, b) => b.sales - a.sales);
             const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
             if (currentPage > totalPages) currentPage = totalPages;
             const startIndex = (currentPage - 1) * itemsPerPage;
             const paginatedItems = filtered.slice(startIndex, startIndex + itemsPerPage);
+            
             tableBody.innerHTML = '';
             if (paginatedItems.length === 0) {
                 tableBody.innerHTML = `<tr><td colspan="9" class="text-center" style="color: #94a3b8; padding: 30px;">Không có dữ liệu.</td></tr>`;
                 paginationContainer.innerHTML = '';
+                checkSelectAllStatus();
                 return;
             }
             paginatedItems.forEach((customer, index) => {
@@ -681,13 +742,15 @@
                 tr.onclick = () => { setFormData(customer); toggleEditMode(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
                 
                 let salesColor = customer.sales >= 0 ? '#10b981' : '#ef4444';
+                let maKhColor = (customer.classification && classificationColors[customer.classification]) ? classificationColors[customer.classification] : 'var(--primary-color)';
+                let maKhTitle = customer.classification ? `Phân loại: ${customer.classification}` : 'Chưa phân loại';
                 
                 tr.innerHTML = `
                     <td class="text-center" onclick="event.stopPropagation()">
                         <input type="checkbox" class="row-checkbox" style="cursor: pointer; width: 16px; height: 16px;" data-id="${customer.customerId}" ${selectedCustomerIds.has(customer.customerId) ? 'checked' : ''}>
                     </td>
                     <td class="text-center"><strong>${startIndex + index + 1}</strong></td>
-                    <td class="nowrap" style="color: var(--primary-color); font-weight: bold;">${customer.customerId}</td>
+                    <td class="nowrap" style="color: ${maKhColor}; font-weight: bold;" title="${maKhTitle}">${customer.customerId}</td>
                     <td class="nowrap">${customer.taxId || '-'}</td>
                     <td><strong>${customer.companyName || '-'}</strong></td>
                     <td class="nowrap">${customer.contactName || '-'}</td>
@@ -704,10 +767,10 @@
         function checkSoftDuplicates(data) {
             let warnings = [];
             customers.forEach(c => {
-                if (c.customerId.toLowerCase() !== data.customerId.toLowerCase()) {
-                    if (data.taxId && c.taxId && c.taxId === data.taxId) warnings.push(`- <strong>Mã số thuế</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
-                    if (data.companyName && c.companyName && c.companyName.toLowerCase() === data.companyName.toLowerCase()) warnings.push(`- <strong>Tên công ty</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
-                    if (data.phone && c.phone && c.phone === data.phone) warnings.push(`- <strong>Số điện thoại</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
+                if (String(c.customerId || '').toLowerCase() !== String(data.customerId || '').toLowerCase()) {
+                    if (data.taxId && c.taxId && String(c.taxId) === String(data.taxId)) warnings.push(`- <strong>Mã số thuế</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
+                    if (data.companyName && c.companyName && String(c.companyName).toLowerCase() === String(data.companyName).toLowerCase()) warnings.push(`- <strong>Tên công ty</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
+                    if (data.phone && c.phone && String(c.phone) === String(data.phone)) warnings.push(`- <strong>Số điện thoại</strong> trùng với khách hàng <span style="color: var(--primary-color)">${c.customerId}</span>`);
                 }
             });
             return [...new Set(warnings)];
@@ -715,10 +778,10 @@
 
         function proceedWithSave(data, isUpdating) {
             if (isUpdating) {
-                const index = customers.findIndex(c => c.customerId.toLowerCase() === data.customerId.toLowerCase());
+                const index = customers.findIndex(c => String(c.customerId || '').toLowerCase() === String(data.customerId || '').toLowerCase());
                 if (index !== -1) { customers[index] = data; saveData(); toggleEditMode(false); renderTable(); }
             } else {
-                const exists = customers.find(c => c.customerId.toLowerCase() === data.customerId.toLowerCase());
+                const exists = customers.find(c => String(c.customerId || '').toLowerCase() === String(data.customerId || '').toLowerCase());
                 if (exists) {
                     pendingCustomerData = data;
                     modalMessage.innerHTML = `Mã khách hàng <strong>"${data.customerId}"</strong> đã tồn tại. Bạn có muốn cập nhật thông tin và doanh số không?`;
@@ -749,12 +812,17 @@
 
         form.addEventListener('submit', function(e) { 
             e.preventDefault(); 
-            handleSaveAction(getFormData(), false); 
+            // Cập nhật thông minh: Nếu đang sửa KH mà người dùng ấn 'Enter' -> tự hiểu là thao tác Cập Nhật chứ không phải Thêm Mới.
+            if (isEditing) {
+                btnUpdate.click();
+            } else {
+                handleSaveAction(getFormData(), false); 
+            }
         });
 
         btnUpdate.addEventListener('click', function() { 
             const data = getFormData();
-            const addedSalesStr = addSalesInput.value.replace(/,/g, '');
+            const addedSalesStr = addSalesInput.value.replace(/[,.]/g, '');
             
             if (addedSalesStr !== '-' && addedSalesStr !== '') {
                 const addedSales = Number(addedSalesStr) || 0;
@@ -782,13 +850,13 @@
         btnConfirmWarning.addEventListener('click', function() { if (pendingActionData) proceedWithSave(pendingActionData.data, pendingActionData.isUpdating); warningModal.style.display = 'none'; pendingActionData = null; });
         btnCancelWarning.addEventListener('click', function() { warningModal.style.display = 'none'; pendingActionData = null; });
         btnDelete.addEventListener('click', function() { const id = idInput.value.trim(); customerToDelete = id; deleteModalMessage.innerHTML = `Bạn có chắc chắn muốn xóa khách hàng <strong>"${id}"</strong> không?`; deleteModal.style.display = 'flex'; });
-        btnConfirmDelete.addEventListener('click', function() { if (customerToDelete) { customers = customers.filter(c => c.customerId.toLowerCase() !== customerToDelete.toLowerCase()); saveData(); toggleEditMode(false); renderTable(); } deleteModal.style.display = 'none'; });
+        btnConfirmDelete.addEventListener('click', function() { if (customerToDelete) { customers = customers.filter(c => String(c.customerId).toLowerCase() !== String(customerToDelete).toLowerCase()); saveData(); toggleEditMode(false); renderTable(); } deleteModal.style.display = 'none'; });
         btnCancelDelete.addEventListener('click', function() { deleteModal.style.display = 'none'; });
         btnCancelEdit.addEventListener('click', function() { toggleEditMode(false); });
         searchInput.addEventListener('input', () => { currentPage = 1; renderTable(); });
 
         document.getElementById('btnConfirmModal').addEventListener('click', function() {
-            const index = customers.findIndex(c => c.customerId.toLowerCase() === pendingCustomerData.customerId.toLowerCase());
+            const index = customers.findIndex(c => String(c.customerId).toLowerCase() === String(pendingCustomerData.customerId).toLowerCase());
             if (index !== -1) { customers[index] = pendingCustomerData; saveData(); }
             modal.style.display = 'none'; toggleEditMode(false); renderTable();
         });
@@ -797,11 +865,12 @@
         function getFilteredAndSortedData() {
             const query = searchInput.value.toLowerCase();
             let filtered = customers.filter(c => 
-                c.customerId.toLowerCase().includes(query) ||
-                (c.companyName && c.companyName.toLowerCase().includes(query)) ||
-                (c.taxId && c.taxId.toLowerCase().includes(query)) ||
-                (c.contactName && c.contactName.toLowerCase().includes(query)) ||
-                (c.phone && c.phone.includes(query))
+                String(c.customerId || '').toLowerCase().includes(query) ||
+                (c.companyName && String(c.companyName).toLowerCase().includes(query)) ||
+                (c.taxId && String(c.taxId).toLowerCase().includes(query)) ||
+                (c.contactName && String(c.contactName).toLowerCase().includes(query)) ||
+                (c.phone && String(c.phone).includes(query)) ||
+                (c.classification && String(c.classification).toLowerCase().includes(query))
             );
             filtered.sort((a, b) => b.sales - a.sales);
             return filtered;
@@ -813,12 +882,13 @@
 
             const exportData = data.map((c, index) => ({
                 "STT": index + 1,
-                "Mã KH": c.customerId,
+                "Mã KH": c.customerId || "",
+                "Phân loại": c.classification || "",
                 "MST": c.taxId || "",
                 "Tên Công ty": c.companyName || "",
                 "Người liên hệ": c.contactName || "",
                 "Số điện thoại": c.phone || "",
-                "Doanh số KH (VNĐ)": c.sales,
+                "Doanh số KH (VNĐ)": c.sales || 0,
                 "Ghi chú": c.notes || ""
             }));
 
@@ -847,14 +917,16 @@
 
             data.forEach((c, index) => {
                 let salesColor = c.sales >= 0 ? '#10b981' : '#ef4444';
+                let maKhColor = (c.classification && classificationColors[c.classification]) ? classificationColors[c.classification] : '#2563eb';
+                
                 tableBody.push([
                     { text: (index + 1).toString(), alignment: 'center' },
-                    { text: c.customerId || '-', color: '#2563eb', bold: true },
+                    { text: c.customerId || '-', color: maKhColor, bold: true },
                     { text: c.taxId || '-' },
                     { text: c.companyName || '-', bold: true },
                     { text: c.contactName || '-' },
                     { text: c.phone || '-' },
-                    { text: formatCurrency(c.sales), alignment: 'right', color: salesColor, bold: true },
+                    { text: formatCurrency(c.sales || 0), alignment: 'right', color: salesColor, bold: true },
                     { text: c.notes || '-' }
                 ]);
             });
@@ -926,25 +998,26 @@
                     let updatedCount = 0;
 
                     jsonData.forEach(row => {
-                        const custId = (row["Mã KH"] || row["customerId"] || "").toString().trim();
+                        const custId = String(row["Mã KH"] || row["customerId"] || "").trim();
                         if (!custId) return; 
 
                         let salesVal = row["Doanh số KH (VNĐ)"] || row["Doanh số (VNĐ)"] || row["Doanh số"] || row["sales"] || 0;
                         if (typeof salesVal === 'string') {
-                            salesVal = Number(salesVal.replace(/,/g, '').replace(/\./g, '')) || 0;
+                            salesVal = Number(salesVal.replace(/[,.]/g, '')) || 0;
                         }
 
                         const newCustomer = {
                             customerId: custId,
-                            taxId: (row["MST"] || row["Mã số thuế"] || row["taxId"] || "").toString().trim(),
-                            companyName: (row["Tên Công ty"] || row["companyName"] || "").toString().trim(),
-                            contactName: (row["Người liên hệ"] || row["Người LH"] || row["contactName"] || "").toString().trim(),
-                            phone: (row["Số điện thoại"] || row["SĐT"] || row["phone"] || "").toString().trim(),
+                            taxId: String(row["MST"] || row["Mã số thuế"] || row["taxId"] || "").trim(),
+                            companyName: String(row["Tên Công ty"] || row["companyName"] || "").trim(),
+                            classification: String(row["Phân loại"] || row["classification"] || "").trim(),
+                            contactName: String(row["Người liên hệ"] || row["Người LH"] || row["contactName"] || "").trim(),
+                            phone: String(row["Số điện thoại"] || row["SĐT"] || row["phone"] || "").trim(),
                             sales: Number(salesVal) || 0,
-                            notes: (row["Ghi chú"] || row["notes"] || "").toString().trim()
+                            notes: String(row["Ghi chú"] || row["notes"] || "").trim()
                         };
 
-                        const existingIndex = customers.findIndex(c => c.customerId.toLowerCase() === custId.toLowerCase());
+                        const existingIndex = customers.findIndex(c => String(c.customerId).toLowerCase() === custId.toLowerCase());
                         if (existingIndex !== -1) {
                             customers[existingIndex] = newCustomer;
                             updatedCount++;
@@ -977,11 +1050,6 @@
         });
 
         // --- CHỨC NĂNG XÓA NHIỀU KHÁCH HÀNG ---
-        const btnBulkDelete = document.getElementById('btnBulkDelete');
-        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-        const bulkDeleteModal = document.getElementById('bulkDeleteModal');
-        const bulkDeleteModalMessage = document.getElementById('bulkDeleteModalMessage');
-
         function updateBulkDeleteUI() {
             if (selectedCustomerIds.size > 0) {
                 btnBulkDelete.style.display = 'inline-block';
@@ -989,17 +1057,6 @@
             } else {
                 btnBulkDelete.style.display = 'none';
             }
-        }
-
-        function checkSelectAllStatus() {
-            if (!selectAllCheckbox) return;
-            const checkboxes = document.querySelectorAll('.row-checkbox');
-            if (checkboxes.length === 0) {
-                selectAllCheckbox.checked = false;
-                return;
-            }
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            selectAllCheckbox.checked = allChecked;
         }
 
         tableBody.addEventListener('change', function(e) {
@@ -1065,6 +1122,7 @@
             notificationModal.style.display = 'flex';
         });
 
+        // Khởi động giao diện bảng lần đầu
         renderTable();
     </script>
 </body>
