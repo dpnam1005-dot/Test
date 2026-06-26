@@ -175,7 +175,7 @@
             padding: 8px 12px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            width: 200px;
+            width: 250px;
         }
 
         .table-container {
@@ -323,10 +323,10 @@
                         <select id="classification" class="form-control">
                             <option value="">-- Chưa phân loại --</option>
                             <option value="Khách mới">Khách mới (Xanh dương)</option>
-                            <option value="Khách đang mua">Khách đang mua (Cam)</option>
+                            <option value="Thường xuyên">Thường xuyên (Vàng)</option>
+                            <option value="Không thường xuyên">Không thường xuyên (Hồng)</option>
                             <option value="Chưa liên hệ được">Chưa liên hệ được (Xanh lá)</option>
-                            <option value="Chưa phản hồi">Chưa phản hồi (Đỏ)</option>
-                            <option value="Không phản hồi">Không phản hồi (Vàng)</option>
+                            <option value="Không nhu cầu">Không nhu cầu (Đỏ)</option>
                         </select>
                     </div>
 
@@ -373,10 +373,10 @@
                 <div class="table-header-flex">
                     <h2>Bảng Xếp hạng Doanh số</h2>
                     <div class="header-actions">
-                        <input type="text" id="searchInput" class="search-box" placeholder="Tìm kiếm...">
+                        <input type="text" id="searchInput" class="search-box" placeholder="Tìm kiếm khách hàng...">
                         
                         <input type="file" id="fileInputExcel" accept=".xlsx, .xls, .csv" style="display: none;">
-                        <button type="button" id="btnImportExcel" class="btn btn-import-excel btn-sm">Nhập File</button>
+                        <button type="button" id="btnImportExcel" class="btn btn-import-excel btn-sm">Nhập Excel</button>
                         <button type="button" id="btnExportExcel" class="btn btn-export-excel btn-sm">Xuất Excel</button>
                         <button type="button" id="btnExportPDF" class="btn btn-export-pdf btn-sm">Xuất PDF</button>
                         
@@ -397,10 +397,10 @@
                                         <select id="filterClassification" style="padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 12px; font-weight: normal; background: #fff; cursor: pointer; color: var(--text-main); width: auto; max-width: 130px;">
                                             <option value="">Tất cả</option>
                                             <option value="Khách mới">Khách mới</option>
-                                            <option value="Khách đang mua">Khách đang mua</option>
+                                            <option value="Thường xuyên">Thường xuyên</option>
+                                            <option value="Không thường xuyên">Không thường xuyên</option>
                                             <option value="Chưa liên hệ được">Chưa liên hệ được</option>
-                                            <option value="Chưa phản hồi">Chưa phản hồi</option>
-                                            <option value="Không phản hồi">Không phản hồi</option>
+                                            <option value="Không nhu cầu">Không nhu cầu</option>
                                         </select>
                                     </div>
                                 </th>
@@ -438,7 +438,8 @@
                             <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: center;">Thời gian</th>
                             <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0;">Mã KH</th>
                             <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0;">Tên Công ty</th>
-                            <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">Doanh thu tăng</th>
+                            <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">DT Phát sinh</th>
+                            <th style="background: #f8fafc; padding: 10px; border-bottom: 1px solid #e2e8f0;">Ghi chú</th>
                         </tr>
                     </thead>
                     <tbody id="reportTableBody">
@@ -446,7 +447,7 @@
                 </table>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-                <strong>Tổng Doanh Thu:</strong>
+                <strong>Tổng Doanh Thu Phát Sinh:</strong>
                 <strong id="reportTotalRevenue" style="color: #10b981; font-size: 18px;">0 VNĐ</strong>
             </div>
             <div class="modal-actions" style="justify-content: flex-end;">
@@ -534,6 +535,7 @@
         let currentPage = 1;
         const itemsPerPage = 10;
 
+        // Khởi tạo các DOM elements
         const form = document.getElementById('customerForm');
         const searchInput = document.getElementById('searchInput');
         const tableBody = document.getElementById('tableBody');
@@ -586,6 +588,7 @@
 
         let customerToDelete = null;
 
+        // Định dạng dấu phẩy tự động và đổi màu khi nhập số
         function formatInputWithCommas(e) {
             let isNegative = this.value.startsWith('-');
             let rawValue = this.value.replace(/\D/g, ''); 
@@ -622,10 +625,10 @@
 
         const classificationColors = {
             "Khách mới": "#3b82f6",
-            "Khách đang mua": "#FFA500",
+            "Thường xuyên": "#D4AF37",
+            "Không thường xuyên": "#FC5A8D",
             "Chưa liên hệ được": "#10b981",
-            "Chưa phản hồi": "#eab308",
-            "Không phản hồi": "#ef4444"
+            "Không nhu cầu": "#ef4444"
         };
 
         function getFormData() {
@@ -865,6 +868,7 @@
                     data.history.push({
                         date: new Date().toISOString(),
                         amount: addedSales,
+                        note: 'Cập nhật (+/-)'
                     });
 
                     let titleColor = addedSales > 0 ? '#10b981' : '#ef4444';
